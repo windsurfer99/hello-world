@@ -16,7 +16,7 @@
 definition(
     name: "My Test App",
     namespace: "windsurfer99",
-    author: "Bruce Andrews",
+    author: "windsurfer99",
     description: "This is just a test first App",
     category: "",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
@@ -31,7 +31,10 @@ preferences {
     section("Will turn on this light") {
         input "theswitch", "capability.switch", required: true, title: "Which light?"
     }
-}
+    section("Turn off when there's been no movement for") {
+        input "minutes", "number", required: true, title: "Minutes?"
+    }
+ }
 
 def installed() {
 	log.debug "Installed with settings: ${settings}"
@@ -57,5 +60,28 @@ def motionDetectedHandler(evt) {
 }
 def motionStoppedHandler(evt) {
     log.debug "motionStoppedHandler called: $evt"
-    theswitch.off()
+    runIn(60 * minutes, checkMotion)
+}
+def checkMotion() {
+    log.debug "In checkMotion scheduled method"
+    // get the current state object for the motion sensor
+    def motionState = themotion.currentState("motion")
+
+    if (motionState.value == "inactive") {
+            // get the time elapsed between now and when the motion reported inactive plus fudge
+        def elapsed = now() - motionState.date.time +4000
+
+        // elapsed time is in milliseconds, so the threshold must be converted to milliseconds too
+        def threshold = 1000 * 60 * minutes
+
+            if (elapsed >= threshold) {
+            log.debug "Motion has stayed inactive long enough since last check ($elapsed ms):  turning switch off"
+            theswitch.off()
+            } else {
+            log.debug "Motion has not stayed inactive long enough since last check ($elapsed ms):  doing nothing"
+        }
+    } else {
+            // Motion active; just log it and do nothing
+            log.debug "Motion is active, do nothing and wait for inactive"
+    }
 }
